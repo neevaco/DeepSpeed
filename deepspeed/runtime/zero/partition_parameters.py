@@ -687,7 +687,11 @@ class Init(InsertPostInitMethodToModuleSubClasses):
         # It can be same as local_device or it could be CPU or NVMe.
         self.remote_device = self.local_device if remote_device is None else remote_device
         self.pin_memory = pin_memory if (self.remote_device
+<<<<<<< HEAD
                                          == OFFLOAD_CPU_DEVICE) else False
+=======
+                                         == OffloadDeviceEnum.cpu) else False
+>>>>>>> parent of 2210ebe (Release swap buffers for persisted params (#2089))
 
         # Enable fp16 param swapping to NVMe
         if self.remote_device == OFFLOAD_NVME_DEVICE:
