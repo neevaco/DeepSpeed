@@ -37,7 +37,7 @@ from deepspeed.runtime.dataloader import DeepSpeedDataLoader
 from deepspeed.runtime.constants import \
     ROUTE_TRAIN, ROUTE_PREDICT, ROUTE_EVAL, \
     PLD_THETA, PLD_GAMMA, BFLOAT16, FP16
-from deepspeed.runtime.zero.config import ZeroStageEnum
+
 from deepspeed.compression import compression_scheduler
 from deepspeed.compression.constants import \
     WEIGHT_QUANTIZE_IN_FORWARD_ENABLED, \
@@ -50,6 +50,9 @@ from deepspeed.compression.constants import \
     WEIGHT_QUANTIZE_ROUNDING, \
     WEIGHT_QUANTIZE_VERBOSE, \
     WEIGHT_QUANTIZE_KERNEL
+
+from deepspeed.runtime.zero.constants import \
+    ZERO_OPTIMIZATION_OPTIMIZER_STATES, ZERO_OPTIMIZATION_GRADIENTS, ZERO_OPTIMIZATION_WEIGHTS
 from deepspeed.checkpoint.constants import OPTIMIZER_STATE_DICT
 from deepspeed.runtime.sparse_tensor import SparseTensor
 
@@ -661,10 +664,10 @@ class DeepSpeedEngine(Module):
         return self._config.zero_config.allgather_bucket_size
 
     def zero_optimization_partition_gradients(self):
-        return self.zero_optimization_stage() >= ZeroStageEnum.gradients
+        return self.zero_optimization_stage() >= ZERO_OPTIMIZATION_GRADIENTS
 
     def zero_optimization_partition_weights(self):
-        return self.zero_optimization_stage() >= ZeroStageEnum.weights
+        return self.zero_optimization_stage() >= ZERO_OPTIMIZATION_WEIGHTS
 
     def zero_contiguous_gradients(self):
         return self._config.zero_config.contiguous_gradients
@@ -1362,7 +1365,7 @@ class DeepSpeedEngine(Module):
                 "The deprecated version of ZeRO Stage 1 is not supported in deepspeed >= 0.5.9. Please downgrade to a version less than 0.5.9 if you need to use this deprecated version of ZeRO."
             )
 
-        if zero_stage <= ZeroStageEnum.gradients:
+        if zero_stage <= ZERO_OPTIMIZATION_GRADIENTS:
             overlap_comm = self.zero_overlap_comm()
             contiguous_gradients = self.zero_contiguous_gradients()
             round_robin_gradients = self.zero_round_robin_gradients()
@@ -1371,7 +1374,7 @@ class DeepSpeedEngine(Module):
             log_dist('Creating fp16 ZeRO stage {} optimizer'.format(zero_stage),
                      ranks=[0])
             # Overlap and contiguous grads are meaningless in stage 1 and are ignored
-            if zero_stage == ZeroStageEnum.optimizer_states:
+            if zero_stage == ZERO_OPTIMIZATION_OPTIMIZER_STATES:
                 overlap_comm = False
                 contiguous_gradients = False
                 round_robin_gradients = False
@@ -1405,7 +1408,7 @@ class DeepSpeedEngine(Module):
                 gradient_predivide_factor=self.gradient_predivide_factor(),
                 gradient_accumulation_steps=self.gradient_accumulation_steps(),
                 ignore_unused_parameters=self.zero_ignore_unused_parameters(),
-                partition_grads=zero_stage == ZeroStageEnum.gradients,
+                partition_grads=zero_stage == ZERO_OPTIMIZATION_GRADIENTS,
                 round_robin_gradients=round_robin_gradients,
                 has_moe_layers=self.has_moe_layers,
                 fp16_master_weights_and_gradients=self.fp16_master_weights_and_gradients(
@@ -1413,7 +1416,7 @@ class DeepSpeedEngine(Module):
                 communication_data_type=self.communication_data_type,
                 elastic_checkpoint=self.zero_elastic_checkpoint())
 
-        elif zero_stage == ZeroStageEnum.weights:
+        elif zero_stage == ZERO_OPTIMIZATION_WEIGHTS:
             assert not self.has_moe_layers, "MoE not supported with Stage 3"
             if isinstance(optimizer, DummyOptim):
                 log_dist("Creating ZeRO Offload", ranks=[0])
@@ -1730,7 +1733,7 @@ class DeepSpeedEngine(Module):
 
         # Communicate only at gradient accumulation boundaries
         elif self.is_gradient_accumulation_boundary():
-            if self.zero_optimization_stage() == ZeroStageEnum.optimizer_states:
+            if self.zero_optimization_stage() == ZERO_OPTIMIZATION_OPTIMIZER_STATES:
                 self.optimizer.reduce_gradients(
                     pipeline_parallel=self.pipeline_parallelism)
             else:

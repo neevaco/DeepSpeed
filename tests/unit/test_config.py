@@ -124,9 +124,11 @@ def test_temp_config_json(tmpdir):
                          ])
 def test_gather_16bit_params_on_model_save(gather_weights_key):
     config_dict = {
-        gather_weights_key: True,
+        "zero_optimization": {
+            gather_weights_key: True,
+        },
     }
-    config = DeepSpeedZeroConfig(**config_dict)
+    config = DeepSpeedZeroConfig(config_dict)
 
     assert config.gather_16bit_weights_on_model_save == True
 
